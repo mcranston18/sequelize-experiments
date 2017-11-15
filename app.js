@@ -1,34 +1,46 @@
 const Sequelize = require('sequelize');
 
-const db = new Sequelize('sequelize', 'postgres', '', {
+const db = new Sequelize('test_db', 'username', 'password', {
   host: 'localhost',
-  dialect: 'postgres'
+  dialect: 'sqlite',
+  storage: 'db.sqlite'
 });
 
-const models = {};
+// const db = new Sequelize('sequelize', 'postgres', '', {
+//   host: 'localhost',
+//   dialect: 'postgres'
+// });
+
+let models = {};
+let instances = {};
+
 
 db.authenticate()
   .then(() => db.sync({force: true}))
   .then(() => {
     console.log('great!');
-    const {User, Task} = initModels(db);
-    models.User = User;
-    models.Task = Task;
+    const {Team, Player} = initModels(db);
+    models.Team = Team;
+    models.Player = Player;
 
-    return createUserAndTask(User, Task)
+    return createTeamAndPlayer(Team, Player)
   })
-  .then(instances => {
-    return instances.userInstance.destroy();
+  .then(data => {
+    instances = data;
+    return instances.teamInstance.destroy();
   })
   .then(() => {
-    return models.Task.findAll()
+    return models.Player.findById(instances.playerInstance.id)
   })
-  .then(tasks => {
-    console.log('tasks', tasks.length);
+  .then(player => {
+    if (player) {
+      throw Error('Should have deleted players');
+    }
+    console.log('player ', player);
   })
 
 function initModels(db) {
-  const User = db.define('user', {
+  const Team = db.define('team', {
     id: {
       type: Sequelize.UUID,
       defaultValue: Sequelize.UUIDV4,
@@ -41,7 +53,7 @@ function initModels(db) {
     underscored: true
   });
 
-  const Task = db.define('task', {
+  const Player = db.define('player', {
     id: {
       type: Sequelize.UUID,
       defaultValue: Sequelize.UUIDV4,
@@ -54,31 +66,31 @@ function initModels(db) {
     underscored: true
   });
 
-  User.hasMany(Task, {
+  Team.hasMany(Player, {
     foreignKey: {
       allowNull: false
     }
   });
-  Task.belongsTo(User);
+  Player.belongsTo(Team);
 
-  return {User, Task};
+  return {Team, Player};
 }
 
-function createUserAndTask(User, Task) {
+function createTeamAndPlayer(Team, Player) {
   return new Promise(resolve => {
-    User
+    Team
       .sync({force: true})
-      .then(() => User.create({name: 'Jane'}))
-      .then(userInstance => {
-        Task
+      .then(() => Team.create({name: 'Toronto Maple Leafs'}))
+      .then(teamInstance => {
+        Player
           .sync({force: true})
-          .then(() => Task.create({
-            name: 'some task',
-            user_id: userInstance.id
+          .then(() => Player.create({
+            name: 'Auston Matthews',
+            team_id: teamInstance.id
           }))
-          .then(taskInstance => resolve({
-            userInstance,
-            taskInstance
+          .then(playerInstance => resolve({
+            teamInstance,
+            playerInstance
           }))
       })
   })
