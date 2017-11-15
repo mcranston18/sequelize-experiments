@@ -14,32 +14,41 @@ const db = new Sequelize('test_db', 'username', 'password', {
 let models = {};
 let instances = {};
 
+run();
 
-db.authenticate()
-  .then(() => db.sync({force: true}))
-  .then(() => {
-    console.log('great!');
-    const {Team, Player} = initModels(db);
-    models.Team = Team;
-    models.Player = Player;
+async function run() {
+  await db.authenticate();
+  await db.sync({force: true});
+  const models = defineModels(db);
+  const instances = await createModelInstances(models);
 
-    return createTeamAndPlayer(Team, Player)
-  })
-  .then(data => {
-    instances = data;
-    return instances.teamInstance.destroy();
-  })
-  .then(() => {
-    return models.Player.findById(instances.playerInstance.id)
-  })
-  .then(player => {
-    if (player) {
-      throw Error('Should have deleted players');
-    }
-    console.log('player ', player);
-  })
+  // destroy the team which should destro the associated players
+  instances.teamInstance.destroy();
 
-function initModels(db) {
+  // should return null
+  const playerThatShouldBeDeleted = await models.Player.findById(instances.playerInstance.id);
+
+  if (playerThatShouldBeDeleted) {
+    throw new Error('Player not deleted');
+  } else {
+    console.log('success');
+  }
+}
+
+async function createModelInstances(models) {
+  await models.Team.sync({force: true});
+  await models.Player.sync({force: true});
+
+  const teamInstance = await models.Team.create({name: 'Toronto Maple Leafs'});
+  const playerInstance = await models.Player.create({
+    name: 'Auston Matthews',
+    team_id: teamInstance.id
+  });
+
+  return {teamInstance, playerInstance};
+}
+
+function defineModels(db) {
   const Team = db.define('team', {
     id: {
       type: Sequelize.UUID,
@@ -71,27 +80,8 @@ function initModels(db) {
       allowNull: false
     }
   });
+
   Player.belongsTo(Team);
 
   return {Team, Player};
-}
-
-function createTeamAndPlayer(Team, Player) {
-  return new Promise(resolve => {
-    Team
-      .sync({force: true})
-      .then(() => Team.create({name: 'Toronto Maple Leafs'}))
-      .then(teamInstance => {
-        Player
-          .sync({force: true})
-          .then(() => Player.create({
-            name: 'Auston Matthews',
-            team_id: teamInstance.id
-          }))
-          .then(playerInstance => resolve({
-            teamInstance,
-            playerInstance
-          }))
-      })
-  })
 }
