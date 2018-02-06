@@ -1,18 +1,32 @@
+/*
+  Sequelize using Postgres is not deleting records in the "through" table.
+  Steps to recreate
+
+  1. create "films" table
+  2. create "festivals" table
+  3. set m2m between the two
+  4. set association between one film and one festival
+  5. confirm "film" has one row
+  6. confirm "festival" has one row
+  7. confirm "film_festivals" has one row
+  8. delete "film" and "festival"
+  9. expect "film_festivals" to have been deleted
+*/
+
+const process = require('process');
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
 const log = console.log;
+const logError = msg => {
+  console.error('\x1b[31m', msg);
+  process.exit();
+};
 
-const db = new Sequelize('test_db', 'username', 'password', {
+const db = new Sequelize('sequelize', 'postgres', '', {
   host: 'localhost',
-  dialect: 'sqlite',
   logging: false,
-  storage: 'db.sqlite'
+  dialect: 'postgres'
 });
-
-// const db = new Sequelize('sequelize', 'postgres', '', {
-//   host: 'localhost',
-//   dialect: 'postgres'
-// });
 
 
 const selectQuery = {type: db.QueryTypes.SELECT};
@@ -31,22 +45,22 @@ async function run() {
   const countsBefore = await getCounts();
   log('countsBefore', countsBefore);
 
-  // await instances.filmInstance.destroy();
+  await instances.filmInstance.destroy();
   await instances.festivalInstance.destroy();
 
   const countsAfter = await getCounts();
 
   log('countsAfter', countsAfter);
   if (countsAfter.film !== 0) {
-    console.error('\x1b[31m', `Film count should be zero`)
+    logError(`Film count should be zero`)
   }
 
   if (countsAfter.festival !== 0) {
-    console.error('\x1b[31m', `Festival count should be zero`)
+    logError(`Festival count should be zero`)
   }
 
   if (countsAfter.filmFestival !== 0) {
-    console.error('\x1b[31m', `Film festival count should be zero`)
+    logError(`Film festival count should be zero`)
   }
 }
 
@@ -100,20 +114,26 @@ function defineModels(db) {
     underscored: true
   });
 
-  const FilmFestival = db.define('film_festivals', {});
+  const FilmFestival = db.define('film_festivals', {}, {
+    onDelete: 'cascade'
+  });
 
   Film.belongsToMany(Festival, {
     through: FilmFestival,
     foreignKey: {
-      name: 'film_id'
-    }
+      name: 'film_id',
+      allowNull: false
+    },
+    onDelete: 'cascade'
   });
 
   Festival.belongsToMany(Film, {
     through: FilmFestival,
     foreignKey: {
-      name: 'festival_id'
-    }
+      name: 'festival_id',
+      allowNull: false
+    },
+    onDelete: 'cascade'
   });
 
   db.sync();
