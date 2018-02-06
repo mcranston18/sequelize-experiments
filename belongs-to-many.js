@@ -1,16 +1,21 @@
 const Sequelize = require('sequelize');
+const Op = Sequelize.Op;
+const log = console.log;
 
-// const db = new Sequelize('test_db', 'username', 'password', {
-//   host: 'localhost',
-//   dialect: 'sqlite',
-//   storage: 'db.sqlite'
-// });
-
-const db = new Sequelize('sequelize', 'postgres', '', {
+const db = new Sequelize('test_db', 'username', 'password', {
   host: 'localhost',
-  dialect: 'postgres'
+  dialect: 'sqlite',
+  logging: false,
+  storage: 'db.sqlite'
 });
 
+// const db = new Sequelize('sequelize', 'postgres', '', {
+//   host: 'localhost',
+//   dialect: 'postgres'
+// });
+
+
+const selectQuery = {type: db.QueryTypes.SELECT};
 let models = {};
 let instances = {};
 
@@ -21,24 +26,26 @@ async function run() {
   await db.sync({force: true});
   const models = defineModels(db);
   const instances = await createModelInstances(models);
-
   await instances.filmInstance.setFestivals([instances.festivalInstance]);
 
-  await instances.filmInstance.destroy();
+  const countsBefore = await getCounts();
+  log('countsBefore', countsBefore);
+
+  // await instances.filmInstance.destroy();
   await instances.festivalInstance.destroy();
 
-  const counts = await getCounts();
+  const countsAfter = await getCounts();
 
-  console.log('counts', counts);
-  if (counts.film !== 0) {
+  log('countsAfter', countsAfter);
+  if (countsAfter.film !== 0) {
     console.error('\x1b[31m', `Film count should be zero`)
   }
 
-  if (counts.festival !== 0) {
+  if (countsAfter.festival !== 0) {
     console.error('\x1b[31m', `Festival count should be zero`)
   }
 
-  if (counts.filmFestival !== 0) {
+  if (countsAfter.filmFestival !== 0) {
     console.error('\x1b[31m', `Film festival count should be zero`)
   }
 }
@@ -55,14 +62,14 @@ async function createModelInstances(models) {
 }
 
 async function getCounts() {
-  const filmCount = await db.query('SELECT COUNT(*) FROM films;');
-  const festivalCount = await db.query('SELECT COUNT(*) FROM festivals;');
-  const filmFestivalCount = await db.query('SELECT COUNT(*) FROM film_festivals;');
+  const filmCount = await db.query('SELECT COUNT(*) as count FROM films;', selectQuery);
+  const festivalCount = await db.query('SELECT COUNT(*) as count FROM festivals;', selectQuery);
+  const filmFestivalCount = await db.query('SELECT COUNT(*) as count FROM film_festivals;', selectQuery);
 
   return {
-    film: parseInt(filmCount[0][0].count),
-    festival: parseInt(festivalCount[0][0].count),
-    filmFestival: parseInt(filmFestivalCount[0][0].count),
+    film: parseInt(filmCount[0].count),
+    festival: parseInt(festivalCount[0].count),
+    filmFestival: parseInt(filmFestivalCount[0].count),
   }
 }
 
@@ -93,24 +100,20 @@ function defineModels(db) {
     underscored: true
   });
 
-  const FilmFestival = db.define('film_festivals', {}, {});
+  const FilmFestival = db.define('film_festivals', {});
 
   Film.belongsToMany(Festival, {
     through: FilmFestival,
     foreignKey: {
-      name: 'film_id',
-      allowNull: false
-    },
-    onDelete: 'CASCADE'
+      name: 'film_id'
+    }
   });
 
   Festival.belongsToMany(Film, {
     through: FilmFestival,
     foreignKey: {
-      name: 'festival_id',
-      allowNull: false
-    },
-    onDelete: 'CASCADE'
+      name: 'festival_id'
+    }
   });
 
   db.sync();

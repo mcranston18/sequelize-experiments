@@ -1,9 +1,11 @@
 {
   "dependencies": {
+    "lodash": "^4.17.5",
     "mysql2": "^1.5.0",
-    "pg": "6.2.3",
-    "pg-hstore": "2.3.2",
-    "sequelize": "4.4.2",
+    "nodemon": "^1.14.7",
+    "pg": "^7.4.1",
+    "pg-hstore": "^2.3.2",
+    "sequelize": "^4.4.2",
     "sequelize-cli": "2.8.0",
     "sqlite3": "^3.1.13"
   }
