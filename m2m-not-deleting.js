@@ -22,9 +22,11 @@ const logError = msg => {
   process.exit();
 };
 
-const db = new Sequelize('sequelize', 'postgres', '', {
+// grant ALL on database m2m_not_deleting to group postgres;
+
+const db = new Sequelize('m2m_not_deleting', 'postgres', '', {
   host: 'localhost',
-  logging: false,
+  logging: true,
   dialect: 'postgres'
 });
 
@@ -35,9 +37,15 @@ let instances = {};
 
 run();
 
+const tableName = 'film_festivals';
+
 async function run() {
-  await db.authenticate();
+  await db.query(`DROP TABLE IF EXISTS films CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS festivals CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS film_festivals CASCADE;`);
+
   await db.sync({force: true});
+
   const models = defineModels(db);
   const instances = await createModelInstances(models);
   await instances.filmInstance.setFestivals([instances.festivalInstance]);
@@ -45,8 +53,12 @@ async function run() {
   const countsBefore = await getCounts();
   log('countsBefore', countsBefore);
 
-  await instances.filmInstance.destroy();
-  await instances.festivalInstance.destroy();
+  await instances.filmInstance.destroy({
+    truncate: {cascade: true}
+  });
+  await instances.festivalInstance.destroy({
+    truncate: {cascade: true}
+  });
 
   const countsAfter = await getCounts();
 
@@ -67,7 +79,7 @@ async function run() {
 async function createModelInstances(models) {
   await models.Film.sync({force: true});
   await models.Festival.sync({force: true});
-  await db.query('DELETE FROM film_festivals;');
+  // await db.query(`DELETE FROM ${tableName};`);
 
   const filmInstance = await models.Film.create({name: 'Aviator'});
   const festivalInstance = await models.Festival.create({name: 'TIFF'});
@@ -78,7 +90,7 @@ async function createModelInstances(models) {
 async function getCounts() {
   const filmCount = await db.query('SELECT COUNT(*) as count FROM films;', selectQuery);
   const festivalCount = await db.query('SELECT COUNT(*) as count FROM festivals;', selectQuery);
-  const filmFestivalCount = await db.query('SELECT COUNT(*) as count FROM film_festivals;', selectQuery);
+  const filmFestivalCount = await db.query(`SELECT COUNT(*) as count FROM film_festivals;`, selectQuery);
 
   return {
     film: parseInt(filmCount[0].count),
@@ -119,21 +131,11 @@ function defineModels(db) {
   });
 
   Film.belongsToMany(Festival, {
-    through: FilmFestival,
-    foreignKey: {
-      name: 'film_id',
-      allowNull: false
-    },
-    onDelete: 'cascade'
+    through: FilmFestival
   });
 
   Festival.belongsToMany(Film, {
-    through: FilmFestival,
-    foreignKey: {
-      name: 'festival_id',
-      allowNull: false
-    },
-    onDelete: 'cascade'
+    through: FilmFestival
   });
 
   db.sync();
